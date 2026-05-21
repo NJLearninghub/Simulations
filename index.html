@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dwarka Family Itinerary with Map Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Leaflet CSS for the interactive map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        /* Custom scrollbar for timeline */
+        .timeline-scroll::-webkit-scrollbar { width: 8px; }
+        .timeline-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
+        .timeline-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .timeline-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .modal-animate {
+            animation: fadeIn 0.2s ease-out forwards;
+        }
+
+        /* Custom marker styling for the car */
+        .car-marker {
+            font-size: 28px;
+            filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.3));
+            transition: transform 0.1s;
+        }
+
+        /* Pulse effect for active location */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+        .active-ring {
+            position: absolute;
+            width: 100%; height: 100%;
+            background-color: #3b82f6;
+            border-radius: 50%;
+            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+            z-index: -1;
+        }
+    </style>
+</head>
+<body class="text-gray-800 antialiased h-screen flex flex-col overflow-hidden">
+
+    <header class="bg-blue-600 text-white p-4 shadow-md z-20 shrink-0">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div>
+                <h1 class="text-xl md:text-2xl font-bold flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
+                    Dwarka 1-Day Itinerary
+                </h1>
+                <p class="text-sm text-blue-100 mt-1">Seniors & Toddler Optimized (86.6 km)</p>
+            </div>
+            <div class="flex gap-3">
+                <button id="simulateBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors shadow-lg flex items-center gap-2 border-2 border-green-400">
+                    <span>🚗 Start Simulation</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+
+        <!-- Left Pane: Timeline -->
+        <main class="w-full md:w-1/2 lg:w-2/5 h-1/2 md:h-full overflow-y-auto p-4 md:p-6 timeline-scroll relative z-10 bg-gray-50 border-r border-gray-200">
+            <div class="relative">
+                <!-- Vertical Line -->
+                <div class="absolute left-6 top-8 bottom-8 w-1 bg-blue-200 z-0"></div>
+
+                <!-- Timeline Items -->
+                <div id="timelineContainer">
+                    <!-- Item 1 -->
+                    <div class="relative z-10 flex items-start mb-8 group cursor-pointer" onclick="panToLocation(0)">
+                        <div id="marker-0" class="flex-shrink-0 w-12 h-12 rounded-full bg-blue-600 border-4 border-white flex items-center justify-center shadow-md relative">
+                            <span class="text-white font-bold text-xs">START</span>
+                        </div>
+                        <div class="ml-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100 w-full hover:shadow-md transition-shadow">
+                            <h2 class="text-lg font-bold text-gray-800">Dwarka Railway Station</h2>
+                            <p class="text-xs text-gray-500 mb-2">Arrival Point</p>
+                            <p class="text-sm text-gray-600 mb-3">Pre-booked SUV pickup. Arrange porters for luggage.</p>
+                            <button onclick="openChat('Dwarka Railway Station', 'Are there wheelchair and porter facilities available right at the platform?'); event.stopPropagation();" class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-600 hover:text-white transition-colors flex items-center gap-1 w-full justify-center">
+                                🤖 Ask AI
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Item 2 -->
+                    <div class="relative z-10 flex items-start mb-8 group cursor-pointer" onclick="panToLocation(1)">
+                        <div id="marker-1" class="flex-shrink-0 w-12 h-12 rounded-full bg-white border-4 border-blue-200 flex items-center justify-center shadow-sm relative"><span class="text-blue-600 font-bold">1</span></div>
+                        <div class="ml-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100 w-full hover:shadow-md transition-shadow">
+                            <h2 class="text-lg font-bold text-gray-800">Dwarkadhish Temple</h2>
+                            <p class="text-xs text-gray-500 mb-2">Morning Visit • 3.5 km away</p>
+                            <p class="text-sm text-gray-600 mb-3">Early morning darshan to avoid heat. Use accessible lines.</p>
+                            <button onclick="openChat('Dwarkadhish Temple', 'Where is the VIP or accessible entrance for seniors?'); event.stopPropagation();" class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-600 hover:text-white transition-colors flex items-center gap-1 w-full justify-center">
+                                🤖 Ask AI
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Item 3 -->
+                    <div class="relative z-10 flex items-start mb-8 group cursor-pointer" onclick="panToLocation(2)">
+                        <div id="marker-2" class="flex-shrink-0 w-12 h-12 rounded-full bg-white border-4 border-blue-200 flex items-center justify-center shadow-sm relative"><span class="text-blue-600 font-bold">2</span></div>
+                        <div class="ml-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100 w-full hover:shadow-md transition-shadow">
+                            <h2 class="text-lg font-bold text-gray-800">Gomti Ghat</h2>
+                            <p class="text-xs text-gray-500 mb-2">Scenic Relaxation • 1.0 km away</p>
+                            <p class="text-sm text-gray-600 mb-3">View from the top to avoid 56 steps. Good spot for baby rest.</p>
+                            <button onclick="openChat('Gomti Ghat', 'Are there shaded areas near the top to sit and feed the baby?'); event.stopPropagation();" class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-600 hover:text-white transition-colors flex items-center gap-1 w-full justify-center">
+                                🤖 Ask AI
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Item 4 -->
+                    <div class="relative z-10 flex items-start mb-8 group cursor-pointer" onclick="panToLocation(3)">
+                        <div id="marker-3" class="flex-shrink-0 w-12 h-12 rounded-full bg-white border-4 border-blue-200 flex items-center justify-center shadow-sm relative"><span class="text-blue-600 font-bold">3</span></div>
+                        <div class="ml-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100 w-full hover:shadow-md transition-shadow">
+                            <h2 class="text-lg font-bold text-gray-800">Rukmini Devi Mandir</h2>
+                            <p class="text-xs text-gray-500 mb-2">Quick Stop • 2.5 km away</p>
+                            <p class="text-sm text-gray-600 mb-3">Short walk from parking. Pre-lunch detour.</p>
+                            <button onclick="openChat('Rukmini Devi Mandir', 'How close can the car park to the actual temple entrance?'); event.stopPropagation();" class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-600 hover:text-white transition-colors flex items-center gap-1 w-full justify-center">
+                                🤖 Ask AI
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Item 5 -->
+                    <div class="relative z-10 flex items-start mb-8 group cursor-pointer" onclick="panToLocation(4)">
+                        <div id="marker-4" class="flex-shrink-0 w-12 h-12 rounded-full bg-white border-4 border-blue-200 flex items-center justify-center shadow-sm relative"><span class="text-blue-600 font-bold">4</span></div>
+                        <div class="ml-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100 w-full hover:shadow-md transition-shadow">
+                            <h2 class="text-lg font-bold text-gray-800">Nageshwar Jyotirlinga</h2>
+                            <p class="text-xs text-gray-500 mb-2">Afternoon • 16.0 km away</p>
+                            <p class="text-sm text-gray-600 mb-3">Flatter grounds, massive Shiva statue. Good restroom facilities.</p>
+                            <button onclick="openChat('Nageshwar Jyotirlinga', 'Are there clean, hygienic restrooms suitable for a patient here?'); event.stopPropagation();" class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-600 hover:text-white transition-colors flex items-center gap-1 w-full justify-center">
+                                🤖 Ask AI
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Item 6 -->
+                    <div class="relative z-10 flex items-start mb-8 group cursor-pointer" onclick="panToLocation(5)">
+                        <div id="marker-5" class="flex-shrink-0 w-12 h-12 rounded-full bg-white border-4 border-blue-200 flex items-center justify-center shadow-sm relative"><span class="text-blue-600 font-bold">5</span></div>
+                        <div class="ml-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100 w-full hover:shadow-md transition-shadow">
+                            <h2 class="text-lg font-bold text-gray-800">Sudarshan Setu</h2>
+                            <p class="text-xs text-gray-500 mb-2">Scenic Drive • 23.0 km away</p>
+                            <p class="text-sm text-gray-600 mb-3">Drive across the new bridge to avoid the bumpy ferry ride.</p>
+                            <button onclick="openChat('Sudarshan Setu', 'Are we allowed to stop the car on the bridge to take family photos?'); event.stopPropagation();" class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-600 hover:text-white transition-colors flex items-center gap-1 w-full justify-center">
+                                🤖 Ask AI
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Item 7 -->
+                    <div class="relative z-10 flex items-start mb-8 group cursor-pointer" onclick="panToLocation(6)">
+                        <div id="marker-6" class="flex-shrink-0 w-12 h-12 rounded-full bg-white border-4 border-blue-200 flex items-center justify-center shadow-sm relative"><span class="text-blue-600 font-bold">6</span></div>
+                        <div class="ml-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100 w-full hover:shadow-md transition-shadow">
+                            <h2 class="text-lg font-bold text-gray-800">Bet Dwarka</h2>
+                            <p class="text-xs text-gray-500 mb-2">Island Visit • 2.0 km away</p>
+                            <p class="text-sm text-gray-600 mb-3">Historic Krishna residence. Take E-rickshaw from bridge drop-off.</p>
+                            <button onclick="openChat('Bet Dwarka', 'Is the main shrine easily reachable from the new bridge drop-off point?'); event.stopPropagation();" class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-600 hover:text-white transition-colors flex items-center gap-1 w-full justify-center">
+                                🤖 Ask AI
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Item 8 -->
+                    <div class="relative z-10 flex items-start mb-8 group cursor-pointer" onclick="panToLocation(7)">
+                        <div id="marker-7" class="flex-shrink-0 w-12 h-12 rounded-full bg-white border-4 border-blue-200 flex items-center justify-center shadow-sm relative"><span class="text-blue-600 font-bold">7</span></div>
+                        <div class="ml-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100 w-full hover:shadow-md transition-shadow">
+                            <h2 class="text-lg font-bold text-gray-800">Bhadkeshwar Mahadev</h2>
+                            <p class="text-xs text-gray-500 mb-2">Sunset • 35.0 km away (Return to mainland)</p>
+                            <p class="text-sm text-gray-600 mb-3">Smooth pathway out to the sea. Perfect sunset for the family.</p>
+                            <button onclick="openChat('Bhadkeshwar Mahadev', 'Is the pathway smooth enough to easily push a baby stroller?'); event.stopPropagation();" class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-600 hover:text-white transition-colors flex items-center gap-1 w-full justify-center">
+                                🤖 Ask AI
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Item 9: End -->
+                    <div class="relative z-10 flex items-start mb-8 group cursor-pointer" onclick="panToLocation(8)">
+                        <div id="marker-8" class="flex-shrink-0 w-12 h-12 rounded-full bg-green-500 border-4 border-white flex items-center justify-center shadow-md relative">
+                            <span class="text-white font-bold text-xs">END</span>
+                        </div>
+                        <div class="ml-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100 w-full hover:shadow-md transition-shadow">
+                            <h2 class="text-lg font-bold text-gray-800">Dwarka Bus Station</h2>
+                            <p class="text-xs text-gray-500 mb-2">Departure • 2.5 km away</p>
+                            <p class="text-sm text-gray-600 mb-3">Board sleeper bus for comfortable return journey.</p>
+                            <button onclick="openChat('Dwarka Bus Station', 'Which private bus operators have the most comfortable sleeper seats?'); event.stopPropagation();" class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-600 hover:text-white transition-colors flex items-center gap-1 w-full justify-center">
+                                🤖 Ask AI
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Pane: Map -->
+        <aside class="w-full md:w-1/2 lg:w-3/5 h-1/2 md:h-full z-0 relative">
+            <div id="map" class="w-full h-full"></div>
+            <!-- Overlay Info -->
+            <div id="mapOverlay" class="absolute top-4 left-4 z-[400] bg-white px-4 py-2 rounded-lg shadow-lg font-bold text-sm text-blue-800 border border-blue-200 hidden">
+                Driving to <span id="drivingDest">...</span>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- Chat Modal Overlay -->
+    <div id="chatModal" class="fixed inset-0 bg-black bg-opacity-50 z-[999] hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col h-[500px] max-h-[90vh] modal-animate">
+            <div class="bg-indigo-600 text-white p-4 rounded-t-2xl flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🤖</span>
+                    <h3 id="chatTitle" class="font-bold">Ask AI</h3>
+                </div>
+                <button onclick="closeChat()" class="text-indigo-200 hover:text-white transition-colors p-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+            <div id="chatMessages" class="flex-1 p-4 overflow-y-auto flex flex-col gap-3 bg-gray-50"></div>
+            <div class="p-3 bg-white border-t border-gray-100 rounded-b-2xl shrink-0">
+                <form id="chatForm" class="flex gap-2">
+                    <input type="text" id="chatInput" class="flex-1 border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:border-indigo-500 text-sm" placeholder="Ask a question..." autocomplete="off">
+                    <button type="submit" class="bg-indigo-600 text-white rounded-full w-10 h-10 flex items-center justify-center hover:bg-indigo-700 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transform rotate-90" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // 1. Data Definitions
+        const locations = [
+            { id: 0, name: "Dwarka Railway Station", lat: 22.250687, lng: 68.980234 },
+            { id: 1, name: "Dwarkadhish Temple", lat: 22.237681, lng: 68.967358 },
+            { id: 2, name: "Gomti Ghat", lat: 22.236854, lng: 68.967759 },
+            { id: 3, name: "Rukmini Devi Mandir", lat: 22.257314, lng: 68.964419 },
+            { id: 4, name: "Nageshwar Jyotirlinga", lat: 22.334000, lng: 69.094000 },
+            { id: 5, name: "Sudarshan Setu", lat: 22.452126, lng: 69.084156 },
+            { id: 6, name: "Bet Dwarka", lat: 22.457589, lng: 69.100003 },
+            { id: 7, name: "Bhadkeshwar Mahadev", lat: 22.244306, lng: 68.954255 },
+            { id: 8, name: "Dwarka Bus Station", lat: 22.245518, lng: 68.963740 }
+        ];
+
+        // 2. Initialize Leaflet Map
+        const map = L.map('map', {
+            zoomControl: false
+        }).setView([22.250687, 68.980234], 13);
+
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // 3. Draw Route Line (Polyline)
+        const routeCoords = locations.map(loc => [loc.lat, loc.lng]);
+        const polyline = L.polyline(routeCoords, {
+            color: '#3b82f6',
+            weight: 5,
+            opacity: 0.6,
+            dashArray: '10, 10',
+            lineJoin: 'round'
+        }).addTo(map);
+
+        map.fitBounds(polyline.getBounds(), { padding: [30, 30] });
+
+        // 4. Add Destination Markers
+        const pinIcon = L.divIcon({
+            className: 'custom-pin',
+            html: `<div style="background-color: white; border: 3px solid #3b82f6; width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+            iconSize: [14, 14],
+            iconAnchor: [7, 7]
+        });
+
+        locations.forEach((loc, index) => {
+            L.marker([loc.lat, loc.lng], { icon: pinIcon })
+             .bindPopup(`<b>${index === 0 ? 'START' : index === 8 ? 'END' : index}:</b> ${loc.name}`)
+             .addTo(map);
+        });
+
+        // 5. Initialize the Car Marker
+        const carIcon = L.divIcon({
+            className: 'car-marker',
+            html: '🚗',
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+        });
+        let carMarker = L.marker([locations[0].lat, locations[0].lng], { icon: carIcon, zIndexOffset: 1000 }).addTo(map);
+
+        // 6. Simulation & Animation Logic
+        let isSimulating = false;
+        let animationFrameId = null;
+
+        function highlightTimeline(index) {
+            document.querySelectorAll('.active-ring').forEach(el => el.remove());
+
+            const markerDiv = document.getElementById(`marker-${index}`);
+            if (markerDiv) {
+                const ring = document.createElement('div');
+                ring.className = 'active-ring';
+                markerDiv.appendChild(ring);
+                markerDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        function panToLocation(index) {
+            if (isSimulating) return;
+            const loc = locations[index];
+            map.flyTo([loc.lat, loc.lng], 14, { duration: 1.5 });
+            carMarker.setLatLng([loc.lat, loc.lng]);
+            highlightTimeline(index);
+        }
+
+        async function animateCarBetween(startLoc, endLoc, durationMs) {
+            return new Promise((resolve) => {
+                const startLat = startLoc.lat;
+                const startLng = startLoc.lng;
+                const latDiff = endLoc.lat - startLat;
+                const lngDiff = endLoc.lng - startLng;
+
+                let startTime = null;
+
+                function step(timestamp) {
+                    if (!startTime) startTime = timestamp;
+                    let progress = (timestamp - startTime) / durationMs;
+
+                    if (progress > 1) progress = 1;
+
+                    const easeProgress = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+
+                    const currentLat = startLat + (latDiff * easeProgress);
+                    const currentLng = startLng + (lngDiff * easeProgress);
+
+                    carMarker.setLatLng([currentLat, currentLng]);
+                    map.setView([currentLat, currentLng], map.getZoom(), {animate: false});
+
+                    if (progress < 1) {
+                        animationFrameId = requestAnimationFrame(step);
+                    } else {
+                        resolve();
+                    }
+                }
+                animationFrameId = requestAnimationFrame(step);
+            });
+        }
+
+        document.getElementById('simulateBtn').addEventListener('click', async function() {
+            if (isSimulating) {
+                isSimulating = false;
+                cancelAnimationFrame(animationFrameId);
+                this.innerHTML = '<span>🚗 Start Simulation</span>';
+                this.classList.replace('bg-red-500', 'bg-green-500');
+                this.classList.replace('hover:bg-red-600', 'hover:bg-green-600');
+                this.classList.replace('border-red-400', 'border-green-400');
+                document.getElementById('mapOverlay').classList.add('hidden');
+                return;
+            }
+
+            isSimulating = true;
+            this.innerHTML = '<span>🛑 Stop Simulation</span>';
+            this.classList.replace('bg-green-500', 'bg-red-500');
+            this.classList.replace('hover:bg-green-600', 'hover:bg-red-600');
+            this.classList.replace('border-green-400', 'border-red-400');
+
+            const overlay = document.getElementById('mapOverlay');
+            const destText = document.getElementById('drivingDest');
+            overlay.classList.remove('hidden');
+
+            map.setZoom(14);
+
+            for (let i = 0; i < locations.length - 1; i++) {
+                if (!isSimulating) break;
+
+                highlightTimeline(i);
+
+                const current = locations[i];
+                const next = locations[i+1];
+
+                destText.textContent = next.name;
+
+                const dist = map.distance([current.lat, current.lng], [next.lat, next.lng]);
+                const simDuration = Math.min(Math.max(dist / 1000 * 300, 1500), 4000);
+
+                await animateCarBetween(current, next, simDuration);
+
+                if (isSimulating) {
+                    highlightTimeline(i+1);
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+            }
+
+            if (isSimulating) {
+                isSimulating = false;
+                this.innerHTML = '<span>🚗 Start Simulation</span>';
+                this.classList.replace('bg-red-500', 'bg-green-500');
+                this.classList.replace('hover:bg-red-600', 'hover:bg-green-600');
+                this.classList.replace('border-red-400', 'border-green-400');
+                overlay.classList.add('hidden');
+                map.fitBounds(polyline.getBounds(), { padding: [30, 30] });
+            }
+        });
+
+        highlightTimeline(0);
+
+        // 7. Chat Modal Logic
+        const modal = document.getElementById('chatModal');
+        const chatTitle = document.getElementById('chatTitle');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const chatForm = document.getElementById('chatForm');
+
+        let currentLocationContext = '';
+
+        window.openChat = function(locationName, defaultQuestion) {
+            currentLocationContext = locationName;
+            chatTitle.textContent = `Ask about ${locationName}`;
+            chatMessages.innerHTML = '';
+
+            addMessage(`Hi! I can help you with specific details about visiting ${locationName} with your elderly relative and toddler.`, 'ai');
+            chatInput.value = defaultQuestion;
+
+            modal.classList.remove('hidden');
+            chatInput.focus();
+        }
+
+        window.closeChat = function() {
+            modal.classList.add('hidden');
+        }
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeChat();
+        });
+
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const message = chatInput.value.trim();
+            if (message) {
+                addMessage(message, 'user');
+                chatInput.value = '';
+                showTypingIndicator();
+
+                setTimeout(() => {
+                    removeTypingIndicator();
+                    const response = generateAIResponse(message, currentLocationContext);
+                    addMessage(response, 'ai');
+                }, 1200);
+            }
+        });
+
+        function addMessage(text, sender) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `max-w-[85%] rounded-2xl px-4 py-2 text-sm ${
+                sender === 'user'
+                ? 'bg-indigo-600 text-white self-end rounded-br-sm'
+                : 'bg-gray-200 text-gray-800 self-start rounded-bl-sm'
+            }`;
+            msgDiv.textContent = text;
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.id = 'typingIndicator';
+            typingDiv.className = 'bg-gray-200 text-gray-800 self-start rounded-2xl rounded-bl-sm px-4 py-2 text-sm flex gap-1 items-center';
+            typingDiv.innerHTML = `
+                <div class="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce"></div>
+                <div class="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+                <div class="w-1.5 h-1.5 bg-gray-500 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+            `;
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function removeTypingIndicator() {
+            const typingDiv = document.getElementById('typingIndicator');
+            if (typingDiv) typingDiv.remove();
+        }
+
+        function generateAIResponse(question, location) {
+            const lowerQ = question.toLowerCase();
+            let response = "That's a good question. I recommend prioritizing the comfort of your elderly family member above all and asking locals on the ground if conditions change.";
+
+            if (location === 'Dwarka Railway Station' && lowerQ.includes('wheelchair')) {
+                response = "Yes, porters (coolies) are available. While wheelchairs might not be systematically provided, you can arrange one at the station master's office or have your driver bring one.";
+            }
+            else if (location === 'Dwarkadhish Temple' && (lowerQ.includes('vip') || lowerQ.includes('accessible'))) {
+                response = "There is a separate provision for elderly and disabled devotees. Ask security near the entrance; they usually allow seniors and wheelchairs to skip the main queues.";
+            }
+            else if (location === 'Gomti Ghat' && (lowerQ.includes('shade') || lowerQ.includes('feed'))) {
+                response = "Yes, the area near the Sudama Setu entrance has shaded porticos and benches where you can comfortably sit, feed the baby, and enjoy the breeze without going down the steps.";
+            }
+            else if (location === 'Rukmini Devi Mandir' && lowerQ.includes('park')) {
+                response = "The parking lot is situated very close to the temple compound. It requires only a short, flat 1-2 minute walk to the main shrine.";
+            }
+            else if (location === 'Nageshwar Jyotirlinga' && (lowerQ.includes('restroom') || lowerQ.includes('hygienic'))) {
+                response = "As a major Jyotirlinga, the complex has better-maintained public restrooms than smaller shrines. Still, carry your own sanitizing wipes for safety.";
+            }
+            else if (location === 'Sudarshan Setu' && (lowerQ.includes('stop') || lowerQ.includes('photos'))) {
+                response = "You cannot park in driving lanes, but the bridge has designated pedestrian walkways and viewing spots. Your driver can drive slowly so you can enjoy the view from the AC car.";
+            }
+            else if (location === 'Bet Dwarka' && (lowerQ.includes('shrine') || lowerQ.includes('bridge'))) {
+                response = "E-rickshaws are available near the bridge drop-off to take you directly to the temple entrance, minimizing walking for your elderly relative.";
+            }
+            else if (location === 'Bhadkeshwar Mahadev' && (lowerQ.includes('smooth') || lowerQ.includes('stroller'))) {
+                response = "Yes! The pathway is a wide, smooth, modern concrete path out to the sea. Very easy to push a baby stroller or wheelchair.";
+            }
+            else if (location === 'Dwarka Bus Station' && (lowerQ.includes('comfortable') || lowerQ.includes('sleeper'))) {
+                response = "Operators like Patel Tours & Travels generally offer premium AC sleeper coaches. Booking a lower berth is crucial for your 69-year-old relative to avoid climbing.";
+            }
+
+            return response;
+        }
+    </script>
+</body>
+</html>
