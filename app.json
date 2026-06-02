@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "NJ Learning Hub",
+    "slug": "nj-learning-hub",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1e40af"
+      },
+      "package": "com.njlearninghub.simulations",
+      "permissions": ["INTERNET"]
+    },
+    "assetBundlePatterns": ["assets/**"]
+  }
+}
