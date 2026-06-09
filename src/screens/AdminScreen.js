@@ -11,6 +11,12 @@ import { db, storage } from '../config/firebase';
 import { STD_OPTIONS, SUBJECT_OPTIONS } from '../constants/filters';
 import { setAdminPin } from '../utils/pinStorage';
 
+function getFileType(filename) {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith('.tsx') || lower.endsWith('.jsx') || lower.endsWith('.ts')) return 'tsx';
+  return 'html';
+}
+
 function PickerModal({ visible, options, onSelect, onClose, title }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -92,7 +98,7 @@ export default function AdminScreen() {
   async function pickFile() {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['text/html', '*/*'],
+        type: ['text/html', 'text/plain', 'application/octet-stream', '*/*'],
         copyToCacheDirectory: true,
       });
       if (!result.canceled && result.assets?.length > 0) {
@@ -105,14 +111,17 @@ export default function AdminScreen() {
 
   async function handleUpload() {
     if (!title.trim()) { Alert.alert('Error', 'Please enter a title.'); return; }
-    if (!selectedFile) { Alert.alert('Error', 'Please select an HTML file.'); return; }
+    if (!selectedFile) { Alert.alert('Error', 'Please select an HTML or TSX file.'); return; }
 
+    const fileType = getFileType(selectedFile.name);
     setUploading(true);
     try {
-      const htmlContent = await FileSystem.readAsStringAsync(selectedFile.uri);
+      const fileContent = await FileSystem.readAsStringAsync(selectedFile.uri);
       const id = Date.now().toString();
-      const storageRef = ref(storage, `simulations/${id}.html`);
-      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const ext = fileType === 'tsx' ? 'tsx' : 'html';
+      const storageRef = ref(storage, `simulations/${id}.${ext}`);
+      const mimeType = fileType === 'tsx' ? 'text/plain' : 'text/html';
+      const blob = new Blob([fileContent], { type: mimeType });
       await uploadBytes(storageRef, blob);
       const htmlUrl = await getDownloadURL(storageRef);
 
@@ -122,6 +131,7 @@ export default function AdminScreen() {
         subject,
         description: description.trim(),
         htmlUrl,
+        fileType,
         requiresInternet: true,
         addedAt: serverTimestamp(),
       });
@@ -175,6 +185,8 @@ export default function AdminScreen() {
     }
   }
 
+  const detectedType = selectedFile ? getFileType(selectedFile.name) : null;
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.section}>
@@ -212,12 +224,24 @@ export default function AdminScreen() {
           numberOfLines={3}
         />
 
-        <Text style={styles.fieldLabel}>HTML File *</Text>
+        <Text style={styles.fieldLabel}>Simulation File * (.html or .tsx)</Text>
         <TouchableOpacity style={styles.fileBtn} onPress={pickFile}>
           <Text style={styles.fileBtnText}>
-            {selectedFile ? `✓ ${selectedFile.name}` : '📁  Pick HTML File'}
+            {selectedFile ? `✓ ${selectedFile.name}` : '📁  Pick HTML or TSX File'}
           </Text>
         </TouchableOpacity>
+        {detectedType && (
+          <View style={styles.typeBadgeRow}>
+            <View style={[styles.typeBadge, detectedType === 'tsx' ? styles.typeBadgeTsx : styles.typeBadgeHtml]}>
+              <Text style={styles.typeBadgeText}>
+                {detectedType === 'tsx' ? '⚛️ TSX — React Component' : '🌐 HTML Simulation'}
+              </Text>
+            </View>
+            {detectedType === 'tsx' && (
+              <Text style={styles.tsxHint}>Main component must be named <Text style={styles.tsxHintBold}>App</Text></Text>
+            )}
+          </View>
+        )}
 
         <TouchableOpacity
           style={[styles.uploadBtn, uploading && styles.uploadBtnDisabled]}
@@ -241,7 +265,10 @@ export default function AdminScreen() {
                 <View key={sim.id} style={styles.simRow}>
                   <View style={styles.simInfo}>
                     <Text style={styles.simTitle}>{sim.title}</Text>
-                    <Text style={styles.simMeta}>{sim.subject} · {sim.std}</Text>
+                    <Text style={styles.simMeta}>
+                      {sim.subject} · {sim.std}
+                      {sim.fileType === 'tsx' ? ' · ⚛️ TSX' : ' · 🌐 HTML'}
+                    </Text>
                   </View>
                   <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(sim)}>
                     <Text style={styles.deleteBtnText}>Delete</Text>
@@ -352,6 +379,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#eff6ff',
   },
   fileBtnText: { fontSize: 14, color: '#1e40af', fontWeight: '500' },
+  typeBadgeRow: { marginTop: 8, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+  typeBadge: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4, marginRight: 8 },
+  typeBadgeTsx: { backgroundColor: '#ede9fe' },
+  typeBadgeHtml: { backgroundColor: '#e0f2fe' },
+  typeBadgeText: { fontSize: 13, fontWeight: '600' },
+  tsxHint: { fontSize: 12, color: '#64748b' },
+  tsxHintBold: { fontWeight: '700', color: '#7c3aed' },
   uploadBtn: {
     backgroundColor: '#1e40af',
     paddingVertical: 16,

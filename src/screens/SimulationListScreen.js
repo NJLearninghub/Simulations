@@ -79,6 +79,7 @@ export default function SimulationListScreen({ route, navigation }) {
             onPress={() => navigation.navigate('SimulationView', {
               title: item.title,
               htmlUrl: item.htmlUrl,
+              fileType: item.fileType || 'html',
             })}
           />
         )}
