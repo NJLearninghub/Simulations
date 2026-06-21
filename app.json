@@ -6,13 +6,18 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "backgroundColor": "#1e40af",
-    "splash": {
-      "backgroundColor": "#1e40af",
-      "resizeMode": "contain"
-    },
     "updates": {
       "enabled": false
     },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#1e40af",
+          "resizeMode": "contain"
+        }
+      ]
+    ],
     "android": {
       "backgroundColor": "#1e40af",
       "adaptiveIcon": {
