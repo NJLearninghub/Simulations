@@ -16,41 +16,112 @@ const PROTECTION_JS = `(function() {
   true;
 })();`;
 
+const MODULE_TO_GLOBAL = {
+  'lucide-react': 'lucideReact',
+  'recharts': 'Recharts',
+  'framer-motion': 'FramerMotion',
+  'd3': 'd3',
+  'three': 'THREE',
+  'katex': 'katex',
+  'lodash': '_',
+  'date-fns': 'dateFns',
+  'clsx': 'clsx',
+  'classnames': 'classnames',
+};
+
 function buildTsxHtml(tsxContent) {
-  // Strip import/export statements — React globals are injected instead
-  const cleaned = tsxContent
-    .replace(/^import\s+[\s\S]*?from\s+['"](.*?)['"];?\s*$/gm, '')
-    .replace(/^import\s+['"](.*?)['"];?\s*$/gm, '')
+  // Convert named imports to window global destructuring
+  let cleaned = tsxContent.replace(
+    /^import\s+\{([^}]+)\}\s+from\s+['"]([^'"]+)['"];?\s*$/gm,
+    (_, names, mod) => {
+      const g = MODULE_TO_GLOBAL[mod];
+      if (!g) return '';
+      const parts = names.split(',').map(n => {
+        const t = n.trim();
+        const alias = t.split(/\s+as\s+/);
+        return alias.length === 2 ? `${alias[0].trim()}: ${alias[1].trim()}` : t;
+      }).filter(Boolean).join(', ');
+      return `const { ${parts} } = window.${g} || {};`;
+    }
+  );
+
+  // Convert default imports
+  cleaned = cleaned.replace(
+    /^import\s+(\w+)\s+from\s+['"]([^'"]+)['"];?\s*$/gm,
+    (_, name, mod) => {
+      const g = MODULE_TO_GLOBAL[mod];
+      return g ? `const ${name} = window.${g};` : '';
+    }
+  );
+
+  // Strip side-effect / CSS / unknown imports
+  cleaned = cleaned.replace(/^import\s+['"][^'"]+['"];?\s*$/gm, '');
+
+  // Strip export declarations
+  cleaned = cleaned
     .replace(/export\s+default\s+/g, '')
-    .replace(/export\s+\{[^}]*\};?\s*/g, '');
+    .replace(/export\s+\{[^}]*\};?\s*/g, '')
+    .replace(/^export\s+/gm, '');
+
+  // Prevent premature </script> tag closing in the HTML wrapper
+  const safeCode = cleaned.replace(/<\/script/gi, '<\\/script');
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"><\/script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"><\/script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <link rel="stylesheet" href="https://unpkg.com/katex@0.16.10/dist/katex.min.css">
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script>
+  <script src="https://unpkg.com/@babel/standalone@7.24.0/babel.min.js"><\/script>
+  <script src="https://unpkg.com/lucide-react@0.395.0/dist/umd/lucide-react.js"><\/script>
+  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"><\/script>
+  <script src="https://unpkg.com/framer-motion@11.3.0/dist/framer-motion.js"><\/script>
+  <script src="https://unpkg.com/d3@7.9.0/dist/d3.min.js"><\/script>
+  <script src="https://unpkg.com/katex@0.16.10/dist/katex.min.js"><\/script>
   <style>
     *, *::before, *::after { box-sizing: border-box; }
-    html, body, #root { height: 100%; }
-    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; }
+    html, body, #root { height: 100%; margin: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #fff; }
   </style>
 </head>
 <body>
   <div id="root"></div>
+  <div id="__err" style="display:none;padding:16px;color:#dc2626;font-family:monospace;font-size:11px;white-space:pre-wrap;background:#fef2f2;border:1px solid #fca5a5;margin:12px;border-radius:8px;max-height:80vh;overflow:auto"></div>
+  <script>
+    window.__showErr = function(msg) {
+      var el = document.getElementById('__err');
+      if (el) { el.style.display = 'block'; el.textContent = String(msg); }
+      var root = document.getElementById('root');
+      if (root) root.style.display = 'none';
+    };
+    window.addEventListener('error', function(e) {
+      window.__showErr('Runtime Error:\\n' + (e.error ? e.error.message + '\\n' + e.error.stack : e.message));
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      window.__showErr('Unhandled Promise:\\n' + e.reason);
+    });
+  <\/script>
   <script type="text/babel" data-presets="react,typescript">
-    // React hooks available as globals — no imports needed in your component
-    const { useState, useEffect, useCallback, useMemo, useRef, useContext, createContext, Fragment } = React;
+    const { useState, useEffect, useCallback, useMemo, useRef, useContext,
+            createContext, Fragment, forwardRef, memo, lazy, Suspense,
+            useReducer, useLayoutEffect, useTransition, useDeferredValue } = React;
+    const __fm = window.FramerMotion || {};
+    const motion = __fm.motion || {};
+    const AnimatePresence = __fm.AnimatePresence || (({ children }) => children);
 
-    ${cleaned}
+    ${safeCode}
 
-    if (typeof App !== 'undefined') {
-      ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
-    } else {
-      document.getElementById('root').innerHTML =
-        '<div style="padding:24px;color:#dc2626;font-family:sans-serif"><b>Error:</b> No component named <code>App</code> found.<br>Name your main component <b>App</b>.</div>';
+    try {
+      if (typeof App !== 'undefined') {
+        ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+      } else {
+        window.__showErr('No component named "App" found.\\nRename your main component to: function App() { ... }');
+      }
+    } catch(e) {
+      window.__showErr('Render Error: ' + e.message + (e.stack ? '\\n\\n' + e.stack : ''));
     }
   <\/script>
 </body>
