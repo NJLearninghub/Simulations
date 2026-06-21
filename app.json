@@ -5,10 +5,16 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "backgroundColor": "#1e40af",
+    "splash": {
+      "backgroundColor": "#1e40af",
+      "resizeMode": "contain"
+    },
     "updates": {
       "enabled": false
     },
     "android": {
+      "backgroundColor": "#1e40af",
       "adaptiveIcon": {
         "backgroundColor": "#1e40af"
       },
